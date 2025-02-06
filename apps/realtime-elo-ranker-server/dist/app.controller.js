@@ -25,8 +25,8 @@ let AppController = class AppController {
     postMatchResult(winner, loser, draw) {
         this.appService.calculateMatchResult(winner, loser, draw);
     }
-    getRanking() {
-        return this.appService.getRanking();
+    async getRanking() {
+        return await this.appService.getRanking();
     }
     createPlayer(id) {
         this.appService.createPlayer(id);
@@ -49,7 +49,7 @@ __decorate([
     (0, common_1.Get)('ranking'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Array)
+    __metadata("design:returntype", Promise)
 ], AppController.prototype, "getRanking", null);
 __decorate([
     (0, common_1.Post)('player'),

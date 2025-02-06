@@ -7,10 +7,10 @@ export declare class AppController {
     private readonly eventGateway;
     constructor(appService: AppService, eventGateway: EventGateway);
     postMatchResult(winner: string, loser: string, draw: boolean): void;
-    getRanking(): {
+    getRanking(): Promise<{
         id: string;
         rank: number;
-    }[];
+    }[]>;
     createPlayer(id: string): void;
     sendRankingUpdates(): Observable<MessageEvent>;
 }

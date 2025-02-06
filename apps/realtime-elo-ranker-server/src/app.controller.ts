@@ -21,8 +21,8 @@ export class AppController {
   }
 
   @Get('ranking')
-  getRanking(): { id: string, rank: number }[] {
-    return this.appService.getRanking();
+  async getRanking(): Promise<{ id: string, rank: number }[]> {
+    return await this.appService.getRanking();
   }
 
   @Post('player')

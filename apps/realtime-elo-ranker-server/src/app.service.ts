@@ -1,23 +1,21 @@
-// filepath: /home/iut45/Etudiants/o22201673/Documents/DeveloppementAvance/TP/realtime-elo-ranker/apps/realtime-elo-ranker-server/src/app.service.ts
 import { Injectable, Inject } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Player } from './player.entity';
 import { EventEmitter2 } from 'eventemitter2';
 import { EventGateway } from './event.gateway';
 
 @Injectable()
 export class AppService {
-  private players: { [key: string]: { rank: number } } = {};
-
   constructor(
+    @InjectRepository(Player) private playerRepository: Repository<Player>,
     @Inject('EventEmitter2') private readonly eventEmitter: EventEmitter2,
     private readonly eventGateway: EventGateway,
   ) {}
 
-  calculateMatchResult(winnerId: string, loserId: string, draw: boolean): void {
-    this.createPlayer(winnerId);
-    this.createPlayer(loserId);
-
-    const winner = this.players[winnerId];
-    const loser = this.players[loserId];
+  async calculateMatchResult(winnerId: string, loserId: string, draw: boolean): Promise<void> {
+    let winner = await this.createPlayer(winnerId);
+    let loser = await this.createPlayer(loserId);
 
     const expectedWinnerRank = 1 / (1 + 10 ** ((loser.rank - winner.rank) / 400));
     const expectedLoserRank = 1 / (1 + 10 ** ((winner.rank - loser.rank) / 400));
@@ -31,23 +29,30 @@ export class AppService {
       loser.rank += k * (0 - expectedLoserRank);
     }
 
-    const rankingUpdate = this.getRanking();
+    await this.playerRepository.save([winner, loser]);
+
+    const rankingUpdate = await this.getRanking();
     this.eventEmitter.emit('ranking.update', rankingUpdate);
     this.eventGateway.emitRankingUpdate({ updatedPlayers: rankingUpdate });
   }
 
-  getRanking(): { id: string, rank: number }[] {
-    return Object.entries(this.players).map(([id, { rank }]) => ({ id, rank }));
+  async getRanking(): Promise<{ id: string, rank: number }[]> {
+    const players = await this.playerRepository.find();
+    return players.map(player => ({ id: player.id, rank: player.rank }));
   }
 
-  createPlayer(id: string): void {
-    if (!this.players[id]) {
-      this.players[id] = { rank: 1000 }; // Initial rank
-      const player = { id, rank: 1000 };
-      
+  async createPlayer(id: string): Promise<Player> {
+    let player = await this.playerRepository.findOne({ where: { id } });
+    if (!player) {
+      player = new Player();
+      player.id = id;
+      player.rank = 1000; // Rank initial
+      await this.playerRepository.save(player);
       this.eventEmitter.emit('player.created', player);
-      this.eventGateway.emitRankingUpdate({ updatedPlayers: this.getRanking() }); // 🔥 Ajout d'une mise à jour complète
+      const rankingUpdate = await this.getRanking();
+      this.eventGateway.emitRankingUpdate({ updatedPlayers: rankingUpdate });
+
     }
+    return player;
   }
-  
 }

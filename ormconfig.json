@@ -1,0 +1,6 @@
+{
+    "type": "sqlite",
+    "database": "database.sqlite",
+    "entities": ["apps/realtime-elo-ranker-server/src/**/*.entity.ts"],
+    "synchronize": true
+}

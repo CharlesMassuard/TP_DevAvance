@@ -14,19 +14,20 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppService = void 0;
 const common_1 = require("@nestjs/common");
+const typeorm_1 = require("@nestjs/typeorm");
+const typeorm_2 = require("typeorm");
+const player_entity_1 = require("./player.entity");
 const eventemitter2_1 = require("eventemitter2");
 const event_gateway_1 = require("./event.gateway");
 let AppService = class AppService {
-    constructor(eventEmitter, eventGateway) {
+    constructor(playerRepository, eventEmitter, eventGateway) {
+        this.playerRepository = playerRepository;
         this.eventEmitter = eventEmitter;
         this.eventGateway = eventGateway;
-        this.players = {};
     }
-    calculateMatchResult(winnerId, loserId, draw) {
-        this.createPlayer(winnerId);
-        this.createPlayer(loserId);
-        const winner = this.players[winnerId];
-        const loser = this.players[loserId];
+    async calculateMatchResult(winnerId, loserId, draw) {
+        let winner = await this.createPlayer(winnerId);
+        let loser = await this.createPlayer(loserId);
         const expectedWinnerRank = 1 / (1 + 10 ** ((loser.rank - winner.rank) / 400));
         const expectedLoserRank = 1 / (1 + 10 ** ((winner.rank - loser.rank) / 400));
         const k = 32;
@@ -38,27 +39,36 @@ let AppService = class AppService {
             winner.rank += k * (1 - expectedWinnerRank);
             loser.rank += k * (0 - expectedLoserRank);
         }
-        const rankingUpdate = this.getRanking();
+        await this.playerRepository.save([winner, loser]);
+        const rankingUpdate = await this.getRanking();
         this.eventEmitter.emit('ranking.update', rankingUpdate);
         this.eventGateway.emitRankingUpdate({ updatedPlayers: rankingUpdate });
     }
-    getRanking() {
-        return Object.entries(this.players).map(([id, { rank }]) => ({ id, rank }));
+    async getRanking() {
+        const players = await this.playerRepository.find();
+        return players.map(player => ({ id: player.id, rank: player.rank }));
     }
-    createPlayer(id) {
-        if (!this.players[id]) {
-            this.players[id] = { rank: 1000 };
-            const player = { id, rank: 1000 };
+    async createPlayer(id) {
+        let player = await this.playerRepository.findOne({ where: { id } });
+        if (!player) {
+            player = new player_entity_1.Player();
+            player.id = id;
+            player.rank = 1000;
+            await this.playerRepository.save(player);
             this.eventEmitter.emit('player.created', player);
-            this.eventGateway.emitRankingUpdate({ updatedPlayers: this.getRanking() });
+            const rankingUpdate = await this.getRanking();
+            this.eventGateway.emitRankingUpdate({ updatedPlayers: rankingUpdate });
         }
+        return player;
     }
 };
 exports.AppService = AppService;
 exports.AppService = AppService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, common_1.Inject)('EventEmitter2')),
-    __metadata("design:paramtypes", [eventemitter2_1.EventEmitter2,
+    __param(0, (0, typeorm_1.InjectRepository)(player_entity_1.Player)),
+    __param(1, (0, common_1.Inject)('EventEmitter2')),
+    __metadata("design:paramtypes", [typeorm_2.Repository,
+        eventemitter2_1.EventEmitter2,
         event_gateway_1.EventGateway])
 ], AppService);
 //# sourceMappingURL=app.service.js.map
